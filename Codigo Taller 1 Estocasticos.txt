@@ -1,0 +1,177 @@
+# PUNTO 1
+
+set.seed(123)
+
+library(tseries)
+
+simulations <- 10000
+xt <- numeric(simulations)
+for (i in 1:simulations) {
+  n <- 10000
+  beta <- 0.1
+  x <- numeric(n)
+  x[1] <- 0 
+  
+  for (j in 2:n) {
+    x[j] <- beta * x[j - 1] + rnorm(1, 0, 1)
+  }
+  
+  xt[i] <- x[n]
+}
+
+jarque.bera.test(xt)
+
+media <- mean(xt)
+mu <- 0
+ds <- sd(xt)
+
+To <- (media - mu)/(ds/sqrt(simulations))
+tStudent <- qt(1-0.025,simulations-1)
+pt(1.962341,simulations-1)
+
+ds <- sd(xt)
+sigma2 <- 1/(1-beta^2)
+
+chi_observado <- ((simulations-1)*(ds)^2)/sigma2
+chi_right <- qchisq(1-(0.05/2),simulations-1)
+chi_left <- qchisq(0.05/2,simulations-1)
+chi_left
+chi_right
+chi_observado
+
+mean(xt)
+sd(xt)
+
+# PUNTO 2
+
+set.seed(123)
+
+betaPDF <- function(alpha,bet,x) ((x^(alpha-1))*((1-x)^(bet-1)))/beta(alpha,bet)
+
+n <- 1000000
+
+estados_cadena <- numeric(n)
+
+estados_cadena[1] <- 0.5
+
+for (i in 2:n) {
+  propuesta = runif(1)
+  a = betaPDF(2,6,propuesta) / betaPDF(2,6,estados_cadena[i - 1])
+  if (a>=1) estados_cadena[i] = propuesta
+  else {
+    if (rbinom(1,1,a) == 1 ) {
+      estados_cadena[i] = propuesta
+    } else {
+      estados_cadena[i] = estados_cadena[i-1]
+    }
+  }
+}
+
+burn_in = 900000
+muestra_beta = estados_cadena[burn_in:n]
+hist(muestra_beta, main="Distribución Muestra Por Metropolis-Hasting Beta(2,6)", xlab="x", ylab="Frecuencia")
+m <- mean(muestra_beta)
+v <- sd(muestra_beta)^2
+a <- ((m*(1-m))/v - 1)*m
+b <- ((m*(1-m))/v - 1)*(1-m)
+print(a)
+print(b)
+ks.test(estados_cadena, pbeta, shape1=2, shape2=6)
+
+# PUNTO 3
+
+set.seed(123)
+
+# Metodo del rechazo
+
+alpha <- 0.7
+a <- -1000000
+b <- 1000000
+
+densidad_mezcla_distribuciones <- function(x) (1-alpha)*dt(x,3,7) + alpha*dt(x,3,10)
+
+muestra_mezcla_distribuciones <- numeric(100)
+
+for (i in 1:100){
+  pertenece <- FALSE
+  while (pertenece == FALSE) {
+    R1 <- runif(1)
+    R2 <- runif(1)
+    y <- a + (b-a)*R1
+    N <- densidad_mezcla_distribuciones(y) / 0.0978747
+    if (R2 <= N) {
+      muestra_mezcla_distribuciones[i] <- y
+      pertenece <- TRUE
+    }
+  }
+}
+
+print(muestra_mezcla_distribuciones)
+hist(muestra_mezcla_distribuciones, main = "Histograma de Y", xlab = "Intervalos de clase de y_i", ylab = "Frecuencias")
+
+# Distribucion a priori Beta(1,1)
+
+# Definicion de la funcion L (verosimilitud)
+L <- function(alph){
+  r = 1
+  for (i in 1:100){
+    r = r * (1-alph)*dt(muestra_mezcla_distribuciones[i],3,7) + alph*dt(muestra_mezcla_distribuciones[i],3,10)
+  }
+  return(r)
+}
+
+# Metropolis - Hasting 1
+
+n <- 1000000
+
+estados_cadena1 <- numeric(n)
+
+estados_cadena1[1] <- 0.5
+
+for (i in 2:n) {
+  propuesta = runif(1)
+  a <- L(propuesta) / L(estados_cadena1[i - 1])
+  if (a>=1) estados_cadena1[i] = propuesta
+  else {
+    if (rbinom(1,1,a) == 1 ) {
+      estados_cadena1[i] = propuesta
+    } else {
+      estados_cadena1[i] = estados_cadena1[i-1]
+    }
+  }
+}
+
+burn_in1 <- 900000
+muestra_beta1 <- estados_cadena1[burn_in1:1000000]
+h <- hist(muestra_beta1, main = "Histograma de Post-alpha con Beta(1,1)", xlab = "Intervalos de clase", ylab = "Frecuencias")
+
+media_muestra_beta1 <- mean(muestra_beta1)
+print(media_muestra_beta1)
+
+# Distribución a priori Beta(2,10)
+
+# Metropolis - Hasting 2
+
+estados_cadena2 <- numeric(n)
+
+estados_cadena2[1] <- 0.5
+
+for (i in 2:n) {
+  propuesta = rbeta(1,2,10)
+  a <- L(propuesta) / L(estados_cadena2[i - 1])
+  if (a>=1) estados_cadena2[i] = propuesta
+  else {
+    if (rbinom(1,1,a) == 1 ) {
+      estados_cadena2[i] = propuesta
+    } else {
+      estados_cadena2[i] = estados_cadena2[i-1]
+    }
+  }
+}
+
+burn_in2 <- 900000
+muestra_beta2 <- estados_cadena2[burn_in2:1000000]
+h <- hist(muestra_beta2, main = "Histograma de Post-alpha con Beta(2,10)", xlab = "Intervalos de clase", ylab = "Frecuencias")
+
+media_muestra_beta2 <- mean(muestra_beta2)
+print(media_muestra_beta2)
